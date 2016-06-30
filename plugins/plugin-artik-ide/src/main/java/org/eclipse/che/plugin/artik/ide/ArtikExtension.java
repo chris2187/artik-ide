@@ -33,6 +33,7 @@ import org.eclipse.che.plugin.artik.ide.manage.ManageArtikDevicesAction;
 import org.eclipse.che.plugin.artik.ide.resourcemonitor.CPUIndicator;
 import org.eclipse.che.plugin.artik.ide.resourcemonitor.MemoryIndicator;
 import org.eclipse.che.plugin.artik.ide.resourcemonitor.StorageIndicator;
+import org.eclipse.che.plugin.artik.ide.resourcemonitor.TargetNameIndicator;
 import org.eclipse.che.plugin.artik.ide.scp.PushToDeviceManager;
 import org.eclipse.che.plugin.artik.ide.updatesdk.UpdateSDKAction;
 
@@ -85,7 +86,8 @@ public class ArtikExtension {
                                 KeyBindingAgent keyBindingAgent,
                                 MemoryIndicator memoryIndicator,
                                 CPUIndicator cpuIndicator,
-                                StorageIndicator storageIndicator) {
+                                StorageIndicator storageIndicator,
+                                TargetNameIndicator targetNameIndicator) {
         final DefaultActionGroup artikGroup = new DefaultActionGroup(ARTIK_GROUP_MAIN_MENU_NAME, true, actionManager);
         actionManager.registerAction(ARTIK_GROUP_MAIN_MENU_ID, artikGroup);
         final DefaultActionGroup mainMenu = (DefaultActionGroup)actionManager.getAction(GROUP_MAIN_MENU);
@@ -106,12 +108,12 @@ public class ArtikExtension {
 
 
         final DefaultActionGroup rightStatusPanelGroup = (DefaultActionGroup)actionManager.getAction(GROUP_CENTER_STATUS_PANEL);
+        rightStatusPanelGroup.add(targetNameIndicator);
         rightStatusPanelGroup.addSeparator();
         rightStatusPanelGroup.add(memoryIndicator);
         rightStatusPanelGroup.addSeparator();
         rightStatusPanelGroup.add(cpuIndicator);
         rightStatusPanelGroup.addSeparator();
         rightStatusPanelGroup.add(storageIndicator);
-        rightStatusPanelGroup.addSeparator();
     }
 }
