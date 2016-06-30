@@ -16,6 +16,7 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.google.inject.Singleton;
 
+import org.eclipse.che.api.core.model.machine.Machine;
 import org.eclipse.che.api.promises.client.Function;
 import org.eclipse.che.api.promises.client.FunctionException;
 import org.eclipse.che.api.promises.client.Promise;
@@ -45,7 +46,12 @@ public class MemoryIndicator extends AbstractResourceIndicator {
 
     @Override
     protected Promise<String> getValue() {
-        final String machineId = selectCommandAction.getSelectedMachine().getId();
+        final Machine selectedMachine = selectCommandAction.getSelectedMachine();
+        if (selectedMachine == null) {
+            return Promises.resolve("N/A");
+        }
+
+        final String machineId = selectedMachine.getId();
 
         return Promises.all(new Promise[]{resourceMonitorProvider.get().getTotalMemory(machineId),
                                           resourceMonitorProvider.get().getUsedMemory(machineId)})

@@ -39,6 +39,10 @@ public class TargetNameIndicator extends AbstractResourceIndicator {
     @Override
     protected Promise<String> getValue() {
         final Machine selectedMachine = selectCommandAction.getSelectedMachine();
+        if (selectedMachine == null) {
+            return Promises.resolve("N/A");
+        }
+
         final String machineName = selectedMachine.getConfig().getName();
 
         return Promises.resolve("Target: " + machineName);
