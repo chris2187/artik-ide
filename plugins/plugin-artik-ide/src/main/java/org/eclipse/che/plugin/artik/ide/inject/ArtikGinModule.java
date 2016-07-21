@@ -53,4 +53,5 @@ public class ArtikGinModule extends AbstractGinModule {
 
         bind(ResourceIndicatorView.class).to(ResourceIndicatorViewImpl.class);
     }
+
 }

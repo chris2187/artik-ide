@@ -34,7 +34,7 @@ import static org.mockito.Mockito.when;
 
 /** @author Artem Zatsarynnyi */
 @RunWith(GwtMockitoTestRunner.class)
-public class ResourceMonitorTest {
+public class ResourceMonitorServiceTest {
 
     private static final String SOME_TEXT  = "some_text";
     private static final String MACHINE_ID = "device_id";
@@ -55,7 +55,7 @@ public class ResourceMonitorTest {
     @Mock
     private TextResource textResource;
 
-    private ResourceMonitor resourceMonitor;
+    private ResourceMonitorService resourceMonitorService;
 
     @Before
     public void setUp() {
@@ -68,14 +68,14 @@ public class ResourceMonitorTest {
         when(commandDto.withCommandLine(anyString())).thenReturn(commandDto);
         when(dtoFactory.createDto(CommandDto.class)).thenReturn(commandDto);
 
-        resourceMonitor = new ResourceMonitor(machineServiceClient, messageBusProvider, dtoFactory, artikResources);
+        resourceMonitorService = new ResourceMonitorService(machineServiceClient, messageBusProvider, dtoFactory, artikResources);
     }
 
     @Test
     public void testGetTotalMemory() throws Exception {
         when(artikResources.getTotalMemoryCommand()).thenReturn(textResource);
 
-        resourceMonitor.getTotalMemory(MACHINE_ID);
+        resourceMonitorService.getTotalMemory(MACHINE_ID);
 
         verify(artikResources).getTotalMemoryCommand();
         verify(textResource).getText();
@@ -86,7 +86,7 @@ public class ResourceMonitorTest {
     public void testGetUsedMemory() throws Exception {
         when(artikResources.getUsedMemoryCommand()).thenReturn(textResource);
 
-        resourceMonitor.getUsedMemory(MACHINE_ID);
+        resourceMonitorService.getUsedMemory(MACHINE_ID);
 
         verify(artikResources).getUsedMemoryCommand();
         verify(textResource).getText();
@@ -97,7 +97,7 @@ public class ResourceMonitorTest {
     public void testGetCpuUtilization() throws Exception {
         when(artikResources.getCpuCommand()).thenReturn(textResource);
 
-        resourceMonitor.getCpuUtilization(MACHINE_ID);
+        resourceMonitorService.getCpuUtilization(MACHINE_ID);
 
         verify(artikResources).getCpuCommand();
         verify(textResource).getText();
@@ -108,7 +108,7 @@ public class ResourceMonitorTest {
     public void testTotalStorageSpace() throws Exception {
         when(artikResources.getTotalStorageSpaceCommand()).thenReturn(textResource);
 
-        resourceMonitor.getTotalStorageSpace(MACHINE_ID);
+        resourceMonitorService.getTotalStorageSpace(MACHINE_ID);
 
         verify(artikResources).getTotalStorageSpaceCommand();
         verify(textResource).getText();
@@ -119,7 +119,7 @@ public class ResourceMonitorTest {
     public void testUsedStorageSpace() throws Exception {
         when(artikResources.getUsedStorageSpaceCommand()).thenReturn(textResource);
 
-        resourceMonitor.getUsedStorageSpace(MACHINE_ID);
+        resourceMonitorService.getUsedStorageSpace(MACHINE_ID);
 
         verify(artikResources).getUsedStorageSpaceCommand();
         verify(textResource).getText();

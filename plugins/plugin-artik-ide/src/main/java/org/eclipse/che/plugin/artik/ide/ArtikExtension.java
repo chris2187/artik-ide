@@ -30,14 +30,10 @@ import org.eclipse.che.plugin.artik.ide.apidocs.DocsPartPresenter;
 import org.eclipse.che.plugin.artik.ide.apidocs.ShowDocsAction;
 import org.eclipse.che.plugin.artik.ide.keyworddoc.ShowKeywordDocsAction;
 import org.eclipse.che.plugin.artik.ide.manage.ManageArtikDevicesAction;
-import org.eclipse.che.plugin.artik.ide.resourcemonitor.CPUIndicator;
-import org.eclipse.che.plugin.artik.ide.resourcemonitor.MemoryIndicator;
-import org.eclipse.che.plugin.artik.ide.resourcemonitor.StorageIndicator;
-import org.eclipse.che.plugin.artik.ide.resourcemonitor.TargetNameIndicator;
+import org.eclipse.che.plugin.artik.ide.resourcemonitor.ResourceMonitor;
 import org.eclipse.che.plugin.artik.ide.scp.PushToDeviceManager;
 import org.eclipse.che.plugin.artik.ide.updatesdk.UpdateSDKAction;
 
-import static org.eclipse.che.ide.api.action.IdeActions.GROUP_CENTER_STATUS_PANEL;
 import static org.eclipse.che.ide.api.action.IdeActions.GROUP_MAIN_MENU;
 
 /**
@@ -84,10 +80,7 @@ public class ArtikExtension {
                                 ShowDocsAction showDocsAction,
                                 ShowKeywordDocsAction showKeywordDocsAction,
                                 KeyBindingAgent keyBindingAgent,
-                                MemoryIndicator memoryIndicator,
-                                CPUIndicator cpuIndicator,
-                                StorageIndicator storageIndicator,
-                                TargetNameIndicator targetNameIndicator) {
+                                ResourceMonitor resourceMonitor) {
         final DefaultActionGroup artikGroup = new DefaultActionGroup(ARTIK_GROUP_MAIN_MENU_NAME, true, actionManager);
         actionManager.registerAction(ARTIK_GROUP_MAIN_MENU_ID, artikGroup);
         final DefaultActionGroup mainMenu = (DefaultActionGroup)actionManager.getAction(GROUP_MAIN_MENU);
@@ -105,15 +98,5 @@ public class ArtikExtension {
         centerToolbarGroup.add(manageDevicesAction, Constraints.FIRST);
 
         keyBindingAgent.getGlobal().addKey(new KeyBuilder().action().charCode('q').build(), SHOW_KEYWORD_DOCS_ACTION_ID);
-
-
-        final DefaultActionGroup rightStatusPanelGroup = (DefaultActionGroup)actionManager.getAction(GROUP_CENTER_STATUS_PANEL);
-        rightStatusPanelGroup.add(targetNameIndicator);
-        rightStatusPanelGroup.addSeparator();
-        rightStatusPanelGroup.add(memoryIndicator);
-        rightStatusPanelGroup.addSeparator();
-        rightStatusPanelGroup.add(cpuIndicator);
-        rightStatusPanelGroup.addSeparator();
-        rightStatusPanelGroup.add(storageIndicator);
     }
 }

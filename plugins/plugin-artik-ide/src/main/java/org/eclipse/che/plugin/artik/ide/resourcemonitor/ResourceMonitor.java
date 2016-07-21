@@ -11,127 +11,177 @@
  *******************************************************************************/
 package org.eclipse.che.plugin.artik.ide.resourcemonitor;
 
-import com.google.gwt.user.client.rpc.AsyncCallback;
+import com.google.gwt.core.client.JsArrayMixed;
+import com.google.gwt.core.client.Scheduler;
+import com.google.gwt.user.client.Timer;
 import com.google.inject.Inject;
-
-import org.eclipse.che.api.core.model.machine.Command;
-import org.eclipse.che.api.machine.shared.dto.CommandDto;
+import com.google.inject.Provider;
+import com.google.inject.Singleton;
+import com.google.web.bindery.event.shared.EventBus;
+import org.eclipse.che.api.core.model.machine.Machine;
+import org.eclipse.che.api.machine.shared.dto.MachineDto;
+import org.eclipse.che.api.promises.client.Operation;
+import org.eclipse.che.api.promises.client.OperationException;
 import org.eclipse.che.api.promises.client.Promise;
-import org.eclipse.che.api.promises.client.callback.AsyncPromiseHelper;
+import org.eclipse.che.api.promises.client.js.Promises;
+import org.eclipse.che.ide.api.app.AppContext;
 import org.eclipse.che.ide.api.machine.MachineServiceClient;
-import org.eclipse.che.ide.dto.DtoFactory;
-import org.eclipse.che.ide.util.UUID;
-import org.eclipse.che.ide.util.loging.Log;
-import org.eclipse.che.ide.websocket.MessageBus;
-import org.eclipse.che.ide.websocket.MessageBusProvider;
-import org.eclipse.che.ide.websocket.WebSocketException;
-import org.eclipse.che.ide.websocket.rest.SubscriptionHandler;
-import org.eclipse.che.plugin.artik.ide.ArtikResources;
-import org.eclipse.che.plugin.artik.ide.updatesdk.OutputMessageUnmarshaller;
+import org.eclipse.che.ide.extension.machine.client.machine.MachineStateEvent;
+import org.eclipse.che.ide.extension.machine.client.processes.monitoring.MachineMonitors;
 
-import static org.eclipse.che.api.promises.client.callback.AsyncPromiseHelper.createFromAsyncRequest;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Provides system resources usage information.
+ * Resources monitor asks Artik machines for CPU, memory and disk usages
+ *  and displays them in the consoles tree.
  *
- * @author Artem Zatsarynnyi
+ * @author Vitaliy Guliy
  */
-public class ResourceMonitor {
+@Singleton
+public class ResourceMonitor implements MachineStateEvent.Handler {
 
-    private final MachineServiceClient  machineServiceClient;
-    private final MessageBus            messageBus;
-    private final DtoFactory            dtoFactory;
-    private final ArtikResources        resources;
-    private       AsyncCallback<String> commandCallback;
+    private final MachineServiceClient              machineServiceClient;
+    private final AppContext                        appContext;
+    private final MachineMonitors                   machineMonitors;
+    private final Provider<ResourceMonitorService>  resourceMonitorProvider;
+
+    private final List<Machine>                     artikMachines;
 
     @Inject
     public ResourceMonitor(MachineServiceClient machineServiceClient,
-                           MessageBusProvider messageBusProvider,
-                           DtoFactory dtoFactory,
-                           ArtikResources resources) {
+                           EventBus eventBus,
+                           AppContext appContext,
+                           MachineMonitors machineMonitors,
+                           Provider<ResourceMonitorService> resourceMonitorProvider) {
         this.machineServiceClient = machineServiceClient;
-        this.messageBus = messageBusProvider.getMessageBus();
-        this.dtoFactory = dtoFactory;
-        this.resources = resources;
+        this.appContext = appContext;
+        this.machineMonitors = machineMonitors;
+        this.resourceMonitorProvider = resourceMonitorProvider;
+
+        artikMachines = new ArrayList<>();
+
+        eventBus.addHandler(MachineStateEvent.TYPE, this);
+
+        Scheduler.get().scheduleDeferred(new Scheduler.ScheduledCommand() {
+            @Override
+            public void execute() {
+                loadMachines();
+            }
+        });
     }
 
-    private static boolean isErrorMessage(String message) {
-        return message.startsWith("[STDERR]") || message.startsWith("\"[STDERR]");
-    }
-
-    public Promise<String> getTotalMemory(String machineId) {
-        final String cmd = resources.getTotalMemoryCommand().getText();
-        return executeCommand(cmd, machineId);
-    }
-
-    public Promise<String> getUsedMemory(String machineId) {
-        final String cmd = resources.getUsedMemoryCommand().getText();
-        return executeCommand(cmd, machineId);
-    }
-
-    public Promise<String> getCpuUtilization(String machineId) {
-        final String cmd = resources.getCpuCommand().getText();
-        return executeCommand(cmd, machineId);
-    }
-
-    public Promise<String> getTotalStorageSpace(String machineId) {
-        final String cmd = resources.getTotalStorageSpaceCommand().getText();
-        return executeCommand(cmd, machineId);
-    }
-
-    public Promise<String> getUsedStorageSpace(String machineId) {
-        final String cmd = resources.getUsedStorageSpaceCommand().getText();
-        return executeCommand(cmd, machineId);
-    }
-
-    /** Executes a command and returns first message from output as a result. */
-    private Promise<String> executeCommand(String cmd, String machineId) {
-        final String chanel = "process:output:" + UUID.uuid();
-
-        try {
-            messageBus.subscribe(chanel, new SubscriptionHandler<String>(new OutputMessageUnmarshaller()) {
-                @Override
-                protected void onMessageReceived(String message) {
-                    unsubscribe(chanel, this);
-                    if (isErrorMessage(message)) {
-                        commandCallback.onFailure(new Exception(message));
-                    } else {
-                        commandCallback.onSuccess(message);
+    /**
+     * Loads the machine list.
+     */
+    private void loadMachines() {
+        machineServiceClient.getMachines(appContext.getWorkspaceId()).then(new Operation<List<MachineDto>>() {
+            @Override
+            public void apply(List<MachineDto> machines) throws OperationException {
+                for (MachineDto machine : machines) {
+                    if ("artik".equals(machine.getConfig().getType())) {
+                        artikMachines.add(machine);
                     }
                 }
 
-                @Override
-                protected void onErrorReceived(Throwable throwable) {
-                    unsubscribe(chanel, this);
-                    commandCallback.onFailure(throwable);
-                }
-            });
-        } catch (WebSocketException e) {
-            commandCallback.onFailure(new Exception(e));
-        }
-
-        final Promise<String> promise = createFromAsyncRequest(new AsyncPromiseHelper.RequestCall<String>() {
-            @Override
-            public void makeCall(AsyncCallback<String> callback) {
-                commandCallback = callback;
+                UPDATE_TIMER.scheduleRepeating(3000);
             }
         });
-
-        final Command command = dtoFactory.createDto(CommandDto.class)
-                                          .withName("name")
-                                          .withType("custom")
-                                          .withCommandLine(cmd);
-
-        machineServiceClient.executeCommand(machineId, command, chanel);
-
-        return promise;
     }
 
-    private void unsubscribe(String channelId, SubscriptionHandler<String> handler) {
-        try {
-            messageBus.unsubscribe(channelId, handler);
-        } catch (WebSocketException e) {
-            Log.error(ResourceMonitor.class, e);
+    /**
+     * Timer to periodical ask the artik machines for cpu, memory and disk usages
+     *  and to update the corresponding widget in the consoles tree.
+     */
+    private Timer UPDATE_TIMER = new Timer() {
+        @Override
+        public void run() {
+            for (final Machine machine : artikMachines) {
+                updateCPU(machine.getId())
+                        .then(updateMemory(machine.getId()))
+                        .then(updateStorage(machine.getId()));
+            }
+        }
+    };
+
+    /**
+     * Fetches CPU utilization for machine with a given ID and updates the corresponding widget.
+     *
+     * @param machineID
+     *          machine ID
+     */
+    protected Promise updateCPU(final String machineID) {
+        return resourceMonitorProvider.get().getCpuUtilization(machineID).then(new Operation<String>() {
+            @Override
+            public void apply(String value) {
+                int cpu = (int) Math.rint(Double.valueOf(value) * 100);
+
+                machineMonitors.setCpuUsage(machineID, cpu);
+            }
+        });
+    }
+
+    /**
+     * Fetches memory usage for machine with a given ID and updates the corresponding widget.
+     *
+     * @param machineID
+     *          machine ID
+     */
+    private Promise updateMemory(final String machineID) {
+        return Promises.all(new Promise[]{
+                resourceMonitorProvider.get().getTotalMemory(machineID),
+                resourceMonitorProvider.get().getUsedMemory(machineID)})
+                .then(new Operation<JsArrayMixed>() {
+                    @Override
+                    public void apply(JsArrayMixed jsArrayMixed) {
+                        final String totalMemory = jsArrayMixed.getString(0);
+                        final String usedMemory = jsArrayMixed.getString(1);
+
+                        machineMonitors.setMemoryUsage(machineID, Integer.parseInt(usedMemory), Integer.parseInt(totalMemory));
+                    }
+                });
+    }
+
+    /**
+     * Fetches disk usage for machine with a given ID and updates the corresponding widget.
+     *
+     * @param machineID
+     *          machine ID
+     */
+    protected Promise updateStorage(final String machineID) {
+        return Promises.all(new Promise[]{resourceMonitorProvider.get().getTotalStorageSpace(machineID),
+                resourceMonitorProvider.get().getUsedStorageSpace(machineID)})
+                .then(new Operation<JsArrayMixed>() {
+                    @Override
+                    public void apply(JsArrayMixed jsArrayMixed) {
+                        final String totalSpace = jsArrayMixed.getString(0);
+                        final String usedSpace = jsArrayMixed.getString(1);
+
+                        machineMonitors.setDiskUsage(machineID, Integer.parseInt(usedSpace), Integer.parseInt(totalSpace));
+                    }
+                });
+    }
+
+    @Override
+    public void onMachineCreating(MachineStateEvent event) {
+    }
+
+    @Override
+    public void onMachineRunning(MachineStateEvent event) {
+        if ("artik".equals(event.getMachine().getConfig().getType())) {
+            artikMachines.add(event.getMachine());
         }
     }
+
+    @Override
+    public void onMachineDestroyed(MachineStateEvent event) {
+        for (Machine machine : artikMachines) {
+            if (machine.getId().equals(event.getMachineId())) {
+                artikMachines.remove(machine);
+                return;
+            }
+        }
+
+    }
+
 }
